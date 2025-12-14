@@ -1,305 +1,227 @@
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace Expedition0.Tasks
 {
     /// <summary>
-    /// Компонент для отображения результата левой части уравнения в реальном времени
-    /// Автоматически обновляется при изменении значений или операторов
+    /// Простой скрипт для отображения результата бинарных операций в троичной логике
+    /// Отображает результат AST в виде спрайтов чисел 0, 1, 2
     /// </summary>
     public class Type3ResultDisplay : MonoBehaviour
     {
-        [Header("Display Settings")]
-        [SerializeField] private bool animateResultChange = true;
-        [SerializeField] private float animationDuration = 0.3f;
-        [SerializeField] private AnimationCurve scaleCurve = AnimationCurve.EaseInOut(0, 0, 1, 1);
-        
-        [Header("Result Display")]
-        [SerializeField] private UnityEngine.UI.Image resultImage; // UI Image для отображения результата
+        [Header("Result Display Settings")]
+        [SerializeField] private Type3TaskLoader taskLoader; // Ссылка на загрузчик заданий
+        [SerializeField] private Image resultImage; // UI Image для отображения результата
         
         [Header("Result Sprites")]
-        [SerializeField] private Sprite result0Sprite; // Спрайт для False (0)
-        [SerializeField] private Sprite result1Sprite; // Спрайт для Neutral (1)
-        [SerializeField] private Sprite result2Sprite; // Спрайт для True (2)
-        [SerializeField] private Sprite errorSprite; // Спрайт для ошибки вычисления
+        [SerializeField] private Sprite sprite0; // Спрайт для значения 0 (False)
+        [SerializeField] private Sprite sprite1; // Спрайт для значения 1 (Neutral)  
+        [SerializeField] private Sprite sprite2; // Спрайт для значения 2 (True)
+        
+        [Header("Auto Update")]
+        [SerializeField] private bool autoUpdate = true; // Автоматически обновлять результат
+        [SerializeField] private float updateInterval = 0.1f; // Интервал обновления в секундах
         
 
         
-        [Header("Visual Feedback")]
-        [SerializeField] private Material validResultMaterial; // Материал для валидного результата
-        [SerializeField] private Material invalidResultMaterial; // Материал для невалидного результата
-        [SerializeField] private Renderer[] feedbackRenderers; // Рендереры для обратной связи
+        private Trit? currentResult; // Текущий результат
+        private float lastUpdateTime;
         
-        private Type3TaskLoader taskLoader;
-        private Trit? currentResult;
-        private bool isResultValid;
-
         public Trit? CurrentResult => currentResult;
-        public bool IsResultValid => isResultValid;
-
-        private void Awake()
-        {
-            // Инициализация компонента
-        }
 
         private void Start()
         {
-            // Находим TaskLoader в сцене
+            // Автоматически найти taskLoader если не назначен
             if (taskLoader == null)
             {
                 taskLoader = FindObjectOfType<Type3TaskLoader>();
+                if (taskLoader == null)
+                {
+                    Debug.LogWarning("Type3ResultDisplay: TaskLoader not found! Please assign it manually.");
+                }
             }
             
-            // Подписываемся на изменения в слотах
-            SubscribeToSlotChanges();
+            // Автоматически найти resultImage если не назначен
+            if (resultImage == null)
+            {
+                resultImage = GetComponent<Image>();
+                if (resultImage == null)
+                {
+                    Debug.LogWarning("Type3ResultDisplay: Image component not found! Please assign resultImage or add Image component.");
+                }
+            }
             
-            // Обновляем результат при старте
+            // Первоначальное обновление
             UpdateResult();
         }
 
-        private void OnDestroy()
+        private void Update()
         {
-            // Отписываемся от событий
-            UnsubscribeFromSlotChanges();
-        }
-
-        public void SetTaskLoader(Type3TaskLoader loader)
-        {
-            if (taskLoader != null)
+            if (autoUpdate && Time.time - lastUpdateTime >= updateInterval)
             {
-                UnsubscribeFromSlotChanges();
-            }
-            
-            taskLoader = loader;
-            SubscribeToSlotChanges();
-            UpdateResult();
-        }
-
-        private void SubscribeToSlotChanges()
-        {
-            if (taskLoader == null || taskLoader.GetTemplate() == null) return;
-            
-            // Подписываемся на изменения через периодическую проверку
-            // Поскольку у нас нет событий в слотах, будем проверять изменения каждый кадр
-            InvokeRepeating(nameof(CheckForChanges), 0.1f, 0.1f);
-        }
-
-        private void UnsubscribeFromSlotChanges()
-        {
-            CancelInvoke(nameof(CheckForChanges));
-        }
-
-        private void CheckForChanges()
-        {
-            if (taskLoader == null || taskLoader.GetTemplate() == null) return;
-            
-            // Вычисляем текущий результат
-            Trit? newResult = CalculateCurrentResult();
-            
-            // Если результат изменился, обновляем отображение
-            if (newResult != currentResult)
-            {
-                currentResult = newResult;
-                UpdateResultDisplay();
-            }
-        }
-
-        private Trit? CalculateCurrentResult()
-        {
-            if (taskLoader == null || taskLoader.GetTemplate() == null) return null;
-            
-            try
-            {
-                ASTNode rootNode = taskLoader.GetRootNode();
-                if (rootNode == null) return null;
-                
-                Trit result = SolutionAST.Solution(rootNode);
-                isResultValid = true;
-                return result;
-            }
-            catch (System.Exception e)
-            {
-                // Если не удается вычислить (не все слоты заполнены), возвращаем null
-                isResultValid = false;
-                Debug.Log($"Type3ResultDisplay: Cannot calculate result - {e.Message}");
-                return null;
+                UpdateResult();
+                lastUpdateTime = Time.time;
             }
         }
 
         public void UpdateResult()
         {
-            currentResult = CalculateCurrentResult();
-            UpdateResultDisplay();
-        }
+            if (taskLoader == null)
+            {
+                Debug.LogWarning("Type3ResultDisplay: TaskLoader is not assigned!");
+                DisplayError();
+                return;
+            }
 
-        private void UpdateResultDisplay()
-        {
-            if (animateResultChange && resultImage != null)
+            ASTNode rootNode = taskLoader.GetRootNode();
+            if (rootNode == null)
             {
-                StartCoroutine(AnimateResultChange());
+                Debug.LogWarning("Type3ResultDisplay: Root node is null!");
+                DisplayError();
+                return;
             }
-            else
-            {
-                UpdateResultImmediate();
-            }
-            
-            UpdateFeedback();
-        }
 
-        private void UpdateResultImmediate()
-        {
-            // Обновляем UI Image со спрайтом
-            if (resultImage != null)
+            try
             {
-                Sprite spriteToShow = GetResultSprite();
-                resultImage.sprite = spriteToShow;
-                resultImage.enabled = spriteToShow != null;
+                // Вычисляем результат AST
+                Trit result = SolutionAST.Solution(rootNode);
                 
-                Debug.Log($"Type3ResultDisplay: Updated result display to {currentResult} (valid: {isResultValid})");
-            }
-            else
-            {
-                Debug.LogWarning("Type3ResultDisplay: Result Image is not assigned!");
-            }
-        }
-
-        private System.Collections.IEnumerator AnimateResultChange()
-        {
-            if (resultImage == null) yield break;
-            
-            // Анимация смены спрайта через масштаб
-            Vector3 originalScale = resultImage.transform.localScale;
-            Sprite newSprite = GetResultSprite();
-            
-            float elapsedTime = 0f;
-            
-            // Фаза 1: уменьшаем масштаб до 0
-            while (elapsedTime < animationDuration * 0.5f)
-            {
-                float t = elapsedTime / (animationDuration * 0.5f);
-                float curveValue = scaleCurve.Evaluate(t);
-                
-                resultImage.transform.localScale = originalScale * (1f - curveValue);
-                
-                elapsedTime += Time.deltaTime;
-                yield return null;
-            }
-            
-            // Меняем спрайт в середине анимации
-            resultImage.sprite = newSprite;
-            resultImage.enabled = newSprite != null;
-            
-            elapsedTime = 0f;
-            
-            // Фаза 2: увеличиваем масштаб обратно до оригинального
-            while (elapsedTime < animationDuration * 0.5f)
-            {
-                float t = elapsedTime / (animationDuration * 0.5f);
-                float curveValue = scaleCurve.Evaluate(t);
-                
-                resultImage.transform.localScale = originalScale * curveValue;
-                
-                elapsedTime += Time.deltaTime;
-                yield return null;
-            }
-            
-            // Завершаем анимацию
-            resultImage.transform.localScale = originalScale;
-        }
-
-        private Sprite GetResultSprite()
-        {
-            if (!currentResult.HasValue)
-            {
-                return isResultValid ? null : errorSprite;
-            }
-            
-            switch (currentResult.Value.ToInt())
-            {
-                case 0: return result0Sprite; // False
-                case 1: return result1Sprite; // Neutral
-                case 2: return result2Sprite; // True
-                default: return errorSprite;
-            }
-        }
-
-        private void UpdateFeedback()
-        {
-            Material targetMaterial = isResultValid ? validResultMaterial : invalidResultMaterial;
-            
-            if (targetMaterial != null && feedbackRenderers != null)
-            {
-                foreach (var renderer in feedbackRenderers)
+                // Проверяем, изменился ли результат
+                if (currentResult != result)
                 {
-                    if (renderer != null)
-                    {
-                        renderer.material = targetMaterial;
-                    }
+                    Debug.Log($"Type3ResultDisplay: Result changed from {currentResult} to {result}");
+                    currentResult = result;
+                    DisplayResult(result);
                 }
             }
+            catch (System.Exception e)
+            {
+                Debug.LogWarning($"Type3ResultDisplay: Error evaluating AST: {e.Message}");
+                currentResult = null;
+                DisplayError();
+            }
         }
 
-        // Публичные методы для настройки
-        public void SetResultSprites(Sprite result0, Sprite result1, Sprite result2, Sprite error = null)
+        /// <summary>
+        /// Отображает результат вычисления
+        /// </summary>
+        private void DisplayResult(Trit result)
         {
-            result0Sprite = result0;
-            result1Sprite = result1;
-            result2Sprite = result2;
-            errorSprite = error;
+            if (resultImage == null)
+            {
+                Debug.LogWarning("Type3ResultDisplay: Result Image is not assigned!");
+                return;
+            }
+
+            Sprite targetSprite = GetResultSprite(result);
+            if (targetSprite != null)
+            {
+                resultImage.sprite = targetSprite;
+                resultImage.enabled = true; // Показываем Image когда есть спрайт
+                Debug.Log($"Type3ResultDisplay: Displayed sprite result: {result} ({result.ToInt()})");
+            }
+            else
+            {
+                // Скрываем Image когда нет подходящего спрайта
+                resultImage.enabled = false;
+                Debug.LogWarning($"Type3ResultDisplay: No sprite found for result {result}, hiding image");
+            }
         }
 
-        public UnityEngine.UI.Image GetResultImage()
+        /// <summary>
+        /// Отображает ошибку
+        /// </summary>
+        private void DisplayError()
         {
-            return resultImage;
+            if (resultImage != null)
+            {
+                // Скрываем Image при ошибке
+                resultImage.enabled = false;
+                Debug.Log("Type3ResultDisplay: Error occurred, hiding image");
+            }
         }
 
+        /// <summary>
+        /// Получает спрайт для результата
+        /// </summary>
+        private Sprite GetResultSprite(Trit result)
+        {
+            switch (result.ToInt())
+            {
+                case 0: return sprite0; // False
+                case 1: return sprite1; // Neutral
+                case 2: return sprite2; // True
+                default: return null;
+            }
+        }
+
+
+
+        /// <summary>
+        /// Принудительно обновляет результат (для вызова из других скриптов)
+        /// </summary>
+        public void ForceUpdate()
+        {
+            UpdateResult();
+        }
+
+        /// <summary>
+        /// Принудительно обновляет результат (альтернативное имя для совместимости)
+        /// </summary>
         public void ForceUpdateResult()
         {
             UpdateResult();
+        }
+
+        /// <summary>
+        /// Устанавливает TaskLoader для получения AST
+        /// </summary>
+        public void SetTaskLoader(Type3TaskLoader loader)
+        {
+            taskLoader = loader;
+            Debug.Log("Type3ResultDisplay: TaskLoader assigned");
+        }
+
+        /// <summary>
+        /// Устанавливает спрайты для результатов
+        /// </summary>
+        public void SetResultSprites(Sprite s0, Sprite s1, Sprite s2)
+        {
+            sprite0 = s0;
+            sprite1 = s1;
+            sprite2 = s2;
+            Debug.Log("Type3ResultDisplay: Result sprites assigned");
         }
 
         // Методы для тестирования в инспекторе
         [ContextMenu("Force Update Result")]
         public void TestForceUpdate()
         {
-            ForceUpdateResult();
+            UpdateResult();
         }
 
-        [ContextMenu("Test Show False Result")]
-        public void TestShowFalse()
+        [ContextMenu("Test Display 0")]
+        public void TestDisplay0()
         {
-            currentResult = Trit.False;
-            isResultValid = true;
-            UpdateResultDisplay();
+            DisplayResult(Trit.False);
         }
 
-        [ContextMenu("Test Show Neutral Result")]
-        public void TestShowNeutral()
+        [ContextMenu("Test Display 1")]
+        public void TestDisplay1()
         {
-            currentResult = Trit.Neutral;
-            isResultValid = true;
-            UpdateResultDisplay();
+            DisplayResult(Trit.Neutral);
         }
 
-        [ContextMenu("Test Show True Result")]
-        public void TestShowTrue()
+        [ContextMenu("Test Display 2")]
+        public void TestDisplay2()
         {
-            currentResult = Trit.True;
-            isResultValid = true;
-            UpdateResultDisplay();
+            DisplayResult(Trit.True);
         }
 
-        [ContextMenu("Test Show Error")]
-        public void TestShowError()
+        [ContextMenu("Test Display Error")]
+        public void TestDisplayError()
         {
-            currentResult = null;
-            isResultValid = false;
-            UpdateResultDisplay();
-        }
-
-        [ContextMenu("Print Current Result")]
-        public void TestPrintResult()
-        {
-            Debug.Log($"Current Result: {currentResult}, Valid: {isResultValid}");
+            DisplayError();
         }
     }
 }

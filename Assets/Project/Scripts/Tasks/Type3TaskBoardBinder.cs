@@ -3,10 +3,7 @@ using UnityEngine.UI;
 
 namespace Expedition0.Tasks
 {
-    /// <summary>
-    /// Специализированный привязчик для заданий 3-го типа
-    /// Значения используют спрайты, операторы используют префабы объектов
-    /// </summary>
+
     public class Type3TaskBoardBinder : MonoBehaviour
     {
         [Header("Slot Mapping")]
@@ -69,16 +66,26 @@ namespace Expedition0.Tasks
                 
                 if (slotGameObject != null)
                 {
-                    // Для значений используем стандартный ValueSlotView (со спрайтами)
-                    var standardView = slotGameObject.GetComponentInChildren<ValueSlotView>();
-                    if (standardView != null)
+                    // Сначала ищем Type3ValueSlotView (с 3D префабами)
+                    var type3View = slotGameObject.GetComponentInChildren<Type3ValueSlotView>();
+                    if (type3View != null)
                     {
-                        standardView.BindNode(slotNode);
-                        Debug.Log($"Type3TaskBoardBinder: Bound ValueSlotView {i} to AST node");
+                        type3View.BindNode(slotNode);
+                        Debug.Log($"Type3TaskBoardBinder: Bound Type3ValueSlotView {i} to AST node (value: {slotNode.CurrentValue}, locked: {slotNode.IsLocked})");
                     }
                     else
                     {
-                        Debug.LogWarning($"Type3TaskBoardBinder: No ValueSlotView found on slot {i}");
+                        // Fallback: используем стандартный ValueSlotView (со спрайтами)
+                        var standardView = slotGameObject.GetComponentInChildren<ValueSlotView>();
+                        if (standardView != null)
+                        {
+                            standardView.BindNode(slotNode);
+                            Debug.Log($"Type3TaskBoardBinder: Bound standard ValueSlotView {i} to AST node");
+                        }
+                        else
+                        {
+                            Debug.LogWarning($"Type3TaskBoardBinder: No ValueSlotView found on slot {i}");
+                        }
                     }
                 }
 

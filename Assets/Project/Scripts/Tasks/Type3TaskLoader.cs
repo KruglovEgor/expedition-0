@@ -2,16 +2,16 @@ using UnityEngine;
 
 namespace Expedition0.Tasks
 {
-    /// <summary>
-    /// Типы заданий 3-го типа с троичной логикой
-    /// </summary>
+
     public enum Type3TaskType
     {
         AndOrNeutralXY,        // AND(OR(1, X), Y) = 2
         OrXAndFalseY,          // OR(X, AND(0, Y)) = 1
         ComplexXorAndOr,       // XOR(AND(X, Y), OR(1, Z)) = 0
         NotX,                  // NOT(X) = 2
+        XAndYOrZ,
         NotXAndY,              // NOT(X) AND Y = ans
+        NotXorXY,              // NOT(X XOR Y) = ans (XOR не залочен, NOT залочен, X залочен, Y свободно)
         ImplyXYUnlocked,       // IMPLY(X, Y) = 1 (оператор разблокирован)
         FindOperator,          // OP(2, 0) = 1 (найти оператор)
         CalculateResult,       // AND(OR(X, 1), XOR(Y, 2)) = ? (вычислить результат)
@@ -20,10 +20,6 @@ namespace Expedition0.Tasks
         CustomUnary            // Пользовательское унарное задание
     }
 
-    /// <summary>
-    /// Загрузчик заданий 3-го типа с троичной логикой и трубами
-    /// Поддерживает различные конфигурации AST с 3-мя значениями и двумя операциями
-    /// </summary>
     public class Type3TaskLoader : MonoBehaviour
     {
         [Header("Task Configuration")]
@@ -103,6 +99,12 @@ namespace Expedition0.Tasks
                 
                 case Type3TaskType.NotXAndY:
                     return Create3TypeTasks.CreateNotXAndY();
+
+                case Type3TaskType.XAndYOrZ:
+                    return Create3TypeTasks.CreateXAndYOrZ();
+                
+                case Type3TaskType.NotXorXY:
+                    return Create3TypeTasks.CreateNotXorXY();
                 
                 case Type3TaskType.ImplyXYUnlocked:
                     return Create3TypeTasks.CreateImplyXYUnlocked();
@@ -318,6 +320,12 @@ namespace Expedition0.Tasks
         public void TestLoadCustomTriple()
         {
             LoadCustomTripleTask(Operator.AND, Operator.OR, Trit.True, true, true, Trit.Neutral, null, null);
+        }
+
+        [ContextMenu("Load NOT(X XOR Y) Task")]
+        public void TestLoadNotXorTask()
+        {
+            ChangeTaskType(Type3TaskType.NotXorXY);
         }
 
         [ContextMenu("Print Task Info")]

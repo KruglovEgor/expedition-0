@@ -147,6 +147,9 @@ namespace Expedition0.Tasks
         {
             CurrentValue = value;
             IsLocked = isLocked;
+            
+            Debug.Log($"Type3ValueSlotView ({gameObject.name}): ApplyValue called - Value: {value}, Locked: {isLocked}");
+            
             UpdateVisuals();
             UpdateInteractable();
             UpdateFeedback();
@@ -183,6 +186,9 @@ namespace Expedition0.Tasks
                 {
                     boundNode.SetValue(CurrentValue.Value);
                     Debug.Log($"Type3ValueSlotView: Successfully updated AST node with value {CurrentValue.Value}");
+                    
+                    // Уведомляем все Type3ResultDisplay об изменении
+                    NotifyResultDisplays();
                 }
                 catch (System.Exception e)
                 {
@@ -202,6 +208,29 @@ namespace Expedition0.Tasks
             UpdateVisuals();
         }
 
+        private void NotifyResultDisplays()
+        {
+            // Находим Type3ResultDisplay в родительских объектах (того же задания)
+            Type3ResultDisplay parentDisplay = GetComponentInParent<Type3ResultDisplay>();
+            if (parentDisplay != null)
+            {
+                parentDisplay.UpdateResult();
+                Debug.Log($"Type3ValueSlotView: Notified parent ResultDisplay");
+                return;
+            }
+            
+            // Если не найден в родителях, ищем в детях
+            Type3ResultDisplay childDisplay = GetComponentInChildren<Type3ResultDisplay>();
+            if (childDisplay != null)
+            {
+                childDisplay.UpdateResult();
+                Debug.Log($"Type3ValueSlotView: Notified child ResultDisplay");
+                return;
+            }
+            
+            Debug.LogWarning($"Type3ValueSlotView: No ResultDisplay found in parent or child objects");
+        }
+
         private void UpdateVisuals()
         {
             if (animateValueChange && currentValueObject != null)
@@ -216,15 +245,19 @@ namespace Expedition0.Tasks
 
         private void UpdateVisualsImmediate()
         {
+            Debug.Log($"Type3ValueSlotView ({gameObject.name}): UpdateVisualsImmediate - CurrentValue: {CurrentValue}, IsLocked: {IsLocked}");
+            
             // Уничтожаем предыдущий объект значения
             if (currentValueObject != null && destroyPreviousValue)
             {
+                Debug.Log($"Type3ValueSlotView ({gameObject.name}): Destroying previous value object");
                 DestroyImmediate(currentValueObject);
                 currentValueObject = null;
             }
 
             if (!CurrentValue.HasValue)
             {
+                Debug.Log($"Type3ValueSlotView ({gameObject.name}): CurrentValue is null, not spawning object");
                 return;
             }
 
@@ -241,11 +274,11 @@ namespace Expedition0.Tasks
                 currentValueObject.transform.localRotation = Quaternion.Euler(valueRotation);
                 currentValueObject.transform.localScale = valueScale;
                 
-                Debug.Log($"Type3ValueSlotView: Spawned value object for {CurrentValue.Value} ({CurrentValue.Value.ToInt()})");
+                Debug.Log($"Type3ValueSlotView ({gameObject.name}): Successfully spawned value object for {CurrentValue.Value} ({CurrentValue.Value.ToInt()})");
             }
             else
             {
-                Debug.LogWarning($"Type3ValueSlotView: No prefab found for value {CurrentValue.Value}");
+                Debug.LogWarning($"Type3ValueSlotView ({gameObject.name}): No prefab found for value {CurrentValue.Value} - check prefab assignments!");
             }
         }
 
