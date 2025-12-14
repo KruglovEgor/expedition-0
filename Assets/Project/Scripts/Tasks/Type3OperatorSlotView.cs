@@ -3,10 +3,7 @@ using UnityEngine.XR.Interaction.Toolkit;
 
 namespace Expedition0.Tasks
 {
-    /// <summary>
-    /// Отображение слота оператора для заданий 3-го типа с поддержкой префабов объектов
-    /// Вместо спрайтов использует 3D объекты операторов
-    /// </summary>
+
     [RequireComponent(typeof(UnityEngine.XR.Interaction.Toolkit.Interactables.XRSimpleInteractable))]
     public class Type3OperatorSlotView : MonoBehaviour
     {
@@ -25,10 +22,7 @@ namespace Expedition0.Tasks
         [Header("Interaction")]
         [SerializeField] private Collider interactableCollider;
         
-        [Header("Visual Feedback")]
-        [SerializeField] private Material lockedMaterial; // Материал для заблокированных операторов
-        [SerializeField] private Material unlockedMaterial; // Материал для разблокированных операторов
-        [SerializeField] private Renderer[] feedbackRenderers; // Рендереры для обратной связи
+
 
         private UnityEngine.XR.Interaction.Toolkit.Interactables.XRSimpleInteractable xrInteractable;
         private OperatorSlotNode boundNode;
@@ -143,9 +137,15 @@ namespace Expedition0.Tasks
         {
             CurrentOperator = op;
             IsLocked = isLocked;
+            
+            // Если оператор не заблокирован и не задан, устанавливаем случайный
+            if (!IsLocked && !CurrentOperator.HasValue)
+            {
+                SetRandomOperator();
+            }
+            
             UpdateVisuals();
             UpdateInteractable();
-            UpdateFeedback();
         }
 
         private void CycleOperator()
@@ -157,15 +157,14 @@ namespace Expedition0.Tasks
                 return;
             }
 
-            // Определяем доступные операторы для переключения (включая новые операторы для 3-го типа)
+            // Определяем доступные бинарные операторы для переключения
             Operator[] availableOperators = { 
-                Operator.NOT, 
                 Operator.AND, 
                 Operator.OR, 
                 Operator.XOR
             };
             
-            Operator previousOperator = CurrentOperator ?? Operator.NOT;
+            Operator previousOperator = CurrentOperator ?? Operator.AND;
             
             if (!CurrentOperator.HasValue)
             {
@@ -267,21 +266,35 @@ namespace Expedition0.Tasks
             }
         }
 
-        private void UpdateFeedback()
+        private void SetRandomOperator()
         {
-            Material targetMaterial = IsLocked ? lockedMaterial : unlockedMaterial;
+            // Определяем доступные бинарные операторы для случайного выбора
+            Operator[] availableOperators = { 
+                Operator.AND, 
+                Operator.OR, 
+                Operator.XOR
+            };
             
-            if (targetMaterial != null && feedbackRenderers != null)
+            // Выбираем случайный оператор
+            int randomIndex = Random.Range(0, availableOperators.Length);
+            CurrentOperator = availableOperators[randomIndex];
+            
+            // Обновляем AST узел
+            if (boundNode != null && CurrentOperator.HasValue)
             {
-                foreach (var renderer in feedbackRenderers)
+                try
                 {
-                    if (renderer != null)
-                    {
-                        renderer.material = targetMaterial;
-                    }
+                    boundNode.SetOperator(CurrentOperator.Value);
+                    Debug.Log($"Type3OperatorSlotView: Set random operator {CurrentOperator.Value}");
+                }
+                catch (System.Exception e)
+                {
+                    Debug.LogError($"Type3OperatorSlotView: Failed to set random operator in AST: {e.Message}");
                 }
             }
         }
+
+
 
         private void ApplyHoverEffect(bool isHovering)
         {
@@ -311,18 +324,13 @@ namespace Expedition0.Tasks
             return currentOperatorObject;
         }
 
-        /// <summary>
-        /// Проверяет синхронизацию между UI и AST узлом
-        /// </summary>
         public bool IsInSync()
         {
             if (boundNode == null) return false;
             return CurrentOperator == boundNode.CurrentOperator && IsLocked == boundNode.IsLocked;
         }
 
-        /// <summary>
-        /// Принудительно синхронизирует UI с AST узлом
-        /// </summary>
+
         public void SyncWithAST()
         {
             if (boundNode != null)
@@ -377,6 +385,13 @@ namespace Expedition0.Tasks
         public void TestSyncWithAST()
         {
             SyncWithAST();
+        }
+
+        [ContextMenu("Test Set Random Operator")]
+        public void TestSetRandomOperator()
+        {
+            SetRandomOperator();
+            UpdateVisuals();
         }
     }
 }
